@@ -98,7 +98,7 @@ namespace Robust.Client
         [Dependency] private readonly ILocalizationManager _loc = default!;
         [Dependency] private readonly ISystemFontManagerInternal _systemFontManager = default!;
         [Dependency] private readonly LoadingScreenManager _loadscr = default!;
-        [Dependency] private readonly HotReloadManager _hotReloadManager = default!; // DevaStation - hot-reload
+        [Dependency] private readonly IHotReloadManager _hotReloadManager = default!; // DevaStation - hot-reload
 
         private IWebViewManagerHook? _webViewHook;
 

@@ -18,7 +18,7 @@ namespace Robust.Shared.ContentPack;
 /// Does... does the thing.
 /// </summary>
 [Virtual]
-internal class HotReloadManager
+internal class HotReloadManager : IHotReloadManager
 {
     [Dependency] private readonly IModLoaderInternal _modLoader = default!;
     [Dependency] private readonly IEntityManager _entityManager = default!;
@@ -29,33 +29,14 @@ internal class HotReloadManager
     [Dependency] private readonly IConfigurationManager _cfg = default!;
     [Dependency] private readonly ISharedPlayerManager _playerManager = default!;
     [Dependency] private readonly ILogManager _logManager = default!;
-    [Dependency] private readonly IReflectionManager _reflectionManager = default!;
 
     protected ISawmill Sawmill = default!;
 
-    /// <summary>
-    /// Whether a hot-reload is currently in progress. Prevents re-entrant reloads.
-    /// </summary>
     public bool IsReloading { get; private set; }
-
-    /// <summary>
-    /// The assembly directory used for the initial load. Stored so we can reload from the same path.
-    /// </summary>
     public ResPath AssemblyDirectory { get; set; }
-
-    /// <summary>
-    /// The filter prefix used for the initial load (e.g., "Content.").
-    /// </summary>
     public string FilterPrefix { get; set; } = "Content.";
 
-    /// <summary>
-    /// Raised before hot-reload teardown begins. Content can subscribe to clean up static state.
-    /// </summary>
     public event Action? HotReloadPreparing;
-
-    /// <summary>
-    /// Raised after hot-reload completes successfully. Content can subscribe to restart rounds, etc.
-    /// </summary>
     public event Action? HotReloadComplete;
 
     public virtual void Initialize()

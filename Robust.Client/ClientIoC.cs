@@ -175,7 +175,7 @@ namespace Robust.Client
             deps.Register<IXamlProxyHelper, XamlProxyHelper>();
             deps.Register<MarkupTagManager>();
             deps.Register<IHWId, BasicHWId>();
-            deps.Register<HotReloadManager, ClientHotReloadManager>(); // DevaStation - hot-reload
+            deps.Register<IHotReloadManager, ClientHotReloadManager>(); // DevaStation - hot-reload
         }
     }
 }

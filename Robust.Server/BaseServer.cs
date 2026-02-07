@@ -107,7 +107,7 @@ namespace Robust.Server
         [Dependency] private readonly UploadedContentManager _uploadedContMan = default!;
         [Dependency] private readonly NetworkResourceManager _netResMan = default!;
         [Dependency] private readonly IReflectionManager _refMan = default!;
-        [Dependency] private readonly HotReloadManager _hotReloadManager = default!; // DevaStation - hot-reload
+        [Dependency] private readonly IHotReloadManager _hotReloadManager = default!; // DevaStation - hot-reload
 
         private readonly Stopwatch _uptimeStopwatch = new();
 

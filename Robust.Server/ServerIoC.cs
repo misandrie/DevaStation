@@ -103,7 +103,7 @@ namespace Robust.Server
             deps.Register<IHWId, DummyHWId>();
             deps.Register<ILocalizationManager, ServerLocalizationManager>();
             deps.Register<ILocalizationManagerInternal, ServerLocalizationManager>();
-            deps.Register<HotReloadManager, ServerHotReloadManager>(); // DevaStation - hot-reload
+            deps.Register<IHotReloadManager, ServerHotReloadManager>(); // DevaStation - hot-reload
         }
     }
 }
