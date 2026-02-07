@@ -853,7 +853,11 @@ namespace Robust.Shared.GameObjects
             // First, we directly delete all maps. This will delete most entities while reducing the number of component
             // lookups
 
-            var maps = _entTraitDict[typeof(MapComponent)].Keys.ToArray();
+            // No map dict no entities to kill
+            if (!_entTraitDict.TryGetValue(typeof(MapComponent), out var mapDict))
+                return;
+
+            var maps = mapDict.Keys.ToArray();
             foreach (var map in maps)
             {
                 try
@@ -871,7 +875,10 @@ namespace Robust.Shared.GameObjects
             }
 
             // Then delete all other entities.
-            var ents = _entTraitDict[typeof(MetaDataComponent)].ToArray();
+            if (!_entTraitDict.TryGetValue(typeof(MetaDataComponent), out var metaDict))
+                return;
+
+            var ents = metaDict.ToArray();
             DebugTools.Assert(ents.Length == Entities.Count);
             foreach (var (uid, comp) in ents)
             {
