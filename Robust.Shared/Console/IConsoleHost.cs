@@ -295,6 +295,13 @@ namespace Robust.Shared.Console
         /// Removes all text from the local console.
         /// </summary>
         void ClearLocalConsole();
+
+        // DevaStation start - hot-reload
+        /// <summary>
+        /// Clears all registered commands and auto-registration tracking.
+        /// Used during hot-reload teardown to remove commands from unloaded content assemblies.
+        /// </summary>
+        void ClearAllCommands();
     }
 
     internal interface IConsoleHostInternal : IConsoleHost

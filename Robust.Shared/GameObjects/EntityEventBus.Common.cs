@@ -54,7 +54,7 @@ internal sealed partial class EntityEventBus : IEventBus
     // Only required to sort ordered subscriptions, which only happens during initialization
     // so doesn't need to be a frozen dictionary.
 
-    // prevents shitcode, get your subscriptions figured out before you start spawning entities
+    // still prevents shitcode, get your subscriptions figured out before you start spawning entities
     private bool _subscriptionLock;
 
     public bool IgnoreUnregisteredComponents;

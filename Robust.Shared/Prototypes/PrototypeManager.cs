@@ -293,7 +293,17 @@ namespace Robust.Shared.Prototypes
         public void Clear()
         {
             _kindNames.Clear();
+            _kindPriorities.Clear(); // DevaStation - hot-reload
             _kinds = FrozenDictionary<Type, KindData>.Empty;
+
+            // DevaStation start - hot-reload
+            // Reset initialized state so Initialize() can re-run and rediscover prototype kinds
+            if (_initialized)
+            {
+                PrototypesReloaded -= OnReload;
+                _initialized = false;
+            }
+            // DevaStation end
         }
 
         /// <inheritdoc />
@@ -1142,6 +1152,62 @@ namespace Robust.Shared.Prototypes
 
         /// <inheritdoc />
         public event Action<PrototypesReloadedEventArgs>? PrototypesReloaded;
+
+        // DevaStation start
+        public void RemoveKindsByAssembly(Assembly oldAssembly)
+        {
+            var kindsToRemove = new List<Type>();
+            var namesToRemove = new List<string>();
+
+            foreach (var (type, kindData) in _kinds)
+            {
+                if (type.Assembly == oldAssembly)
+                {
+                    kindsToRemove.Add(type);
+                    namesToRemove.Add(kindData.Name);
+                }
+            }
+
+            foreach (var name in namesToRemove)
+            {
+                _kindNames.Remove(name);
+            }
+
+            foreach (var type in kindsToRemove)
+            {
+                _kindPriorities.Remove(type);
+            }
+
+            var mutableKinds = _kinds.ToDictionary();
+            foreach (var type in kindsToRemove)
+            {
+                mutableKinds.Remove(type);
+            }
+
+            Freeze(mutableKinds);
+        }
+
+        internal void AddContentKinds()
+        {
+            var allPrototypeTypes = _reflectionManager.GetAllChildren<IPrototype>();
+
+            var newTypes = allPrototypeTypes.Where(t => !_kinds.ContainsKey(t)).ToList();
+
+            if (newTypes.Count == 0)
+                return;
+
+            var mutableKinds = _kinds.ToDictionary();
+
+            foreach (var type in newTypes)
+            {
+                RegisterKind(type, mutableKinds);
+            }
+
+            Freeze(mutableKinds);
+
+            Sawmill.Info($"Added {newTypes.Count} new prototype kinds");
+        }
+        // DevaStation end
 
         private sealed class KindData(Type kind, string name)
         {

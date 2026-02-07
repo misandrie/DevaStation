@@ -122,5 +122,11 @@ namespace Robust.Shared.Reflection
         IEnumerable<Type> FindAllTypes();
 
         void Initialize();
+
+        // DevaStation - hot-reload
+        /// <summary>
+        /// Removes a specific assembly and invalidates all type caches.
+        /// </summary>
+        void RemoveAssembly(Assembly assembly);
     }
 }

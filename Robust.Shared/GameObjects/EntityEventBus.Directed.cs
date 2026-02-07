@@ -360,6 +360,13 @@ namespace Robust.Shared.GameObjects
             EntAddComponent(e.BaseArgs.Owner, e.ComponentType.Idx);
         }
 
+        // DevaStation start
+        internal void UnlockSubscriptions()
+        {
+            _subscriptionLock = false;
+        }
+        // DevaStation end
+
         internal void LockSubscriptions()
         {
             _subscriptionLock = true;

@@ -74,6 +74,11 @@ namespace Robust.Shared.GameObjects
             {
                 dict.Clear();
             }
+
+            // DevaStation start - hot-reload
+            _entTraitDict = FrozenDictionary<Type, Dictionary<EntityUid, IComponent>>.Empty;
+            _componentFactory.ComponentsAdded -= OnComponentsAdded;
+            // DevaStation end
         }
 
         private void RegisterComponents(IEnumerable<ComponentRegistration> components)
@@ -81,6 +86,15 @@ namespace Robust.Shared.GameObjects
             var traitDict = _entTraitDict.ToDictionary();
             foreach (var reg in components)
             {
+                // DevaStation start - hot-reload
+                // On first init _entTraitArray is Array.Empty so this check is always false.
+                if (reg.Idx.Value < _entTraitArray.Length && _entTraitArray[reg.Idx.Value] is { } existing)
+                {
+                    traitDict[reg.Type] = existing;
+                    continue;
+                }
+                // DevaStation end
+
                 var dict = new Dictionary<EntityUid, IComponent>();
                 traitDict.Add(reg.Type, dict);
                 CompIdx.AssignArray(ref _entTraitArray, reg.Idx, dict);
@@ -1722,7 +1736,6 @@ namespace Robust.Shared.GameObjects
         private void FillComponentDict()
         {
             _entTraitDict = FrozenDictionary<Type, Dictionary<EntityUid, IComponent>>.Empty;
-            Array.Fill(_entTraitArray, null);
             RegisterComponents(_componentFactory.GetAllRegistrations());
         }
     }

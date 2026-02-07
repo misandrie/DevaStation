@@ -107,6 +107,7 @@ namespace Robust.Server
         [Dependency] private readonly UploadedContentManager _uploadedContMan = default!;
         [Dependency] private readonly NetworkResourceManager _netResMan = default!;
         [Dependency] private readonly IReflectionManager _refMan = default!;
+        [Dependency] private readonly HotReloadManager _hotReloadManager = default!; // DevaStation - hot-reload
 
         private readonly Stopwatch _uptimeStopwatch = new();
 
@@ -326,6 +327,11 @@ namespace Robust.Server
                 return true;
             }
 
+            // DevaStation start - hot-reload
+            _hotReloadManager.AssemblyDirectory = Options.AssemblyDirectory;
+            _hotReloadManager.FilterPrefix = resourceManifest.AssemblyPrefix ?? Options.ContentModulePrefix;
+            // DevaStation end
+
             foreach (var loadedModule in _modLoader.LoadedModules)
             {
                 _config.LoadCVarsFromAssembly(loadedModule);
@@ -410,6 +416,8 @@ namespace Robust.Server
             _stringSerializer.LockStrings();
 
             _modLoader.BroadcastRunLevel(ModRunLevel.PostInit);
+
+            _hotReloadManager.Initialize(); // DevaStation - hot-reload
 
             _statusHost.Start();
             _hubManager.Start();

@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Reflection;
 using Robust.Shared.Random;
 using Robust.Shared.Reflection;
 using Robust.Shared.Serialization.Manager;
@@ -620,6 +621,9 @@ public interface IPrototypeManager
     /// Entity prototypes grouped by their categories.
     /// </summary>
     FrozenDictionary<ProtoId<EntityCategoryPrototype>, IReadOnlyList<EntityPrototype>> Categories { get; }
+
+    // DevaStation - hot-reload
+    void RemoveKindsByAssembly(Assembly oldAssembly);
 }
 
 internal interface IPrototypeManagerInternal : IPrototypeManager

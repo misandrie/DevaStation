@@ -267,7 +267,7 @@ namespace Robust.Shared.IoC
                 _pendingResolves.Enqueue(interfaceType);
             }
         }
-        
+
         private void CheckRegisterInterface(Type interfaceType, Type implementationType, bool overwrite)
         {
             lock (_serviceBuildLock)
@@ -334,6 +334,48 @@ namespace Robust.Shared.IoC
                 _injectorCache.Clear();
             }
         }
+
+        // DevaStation start
+        /// <summary>
+        /// Removes all registrations where the implementation type belongs to the given assembly.
+        /// Also removes any built service instances and invalidates the injector cache.
+        /// Used during hot-reload to clear content IoC registrations before re-registration.
+        /// </summary>
+        internal void RemoveRegistrations(Assembly oldAssembly)
+        {
+            var toRemove = new List<Type>();
+
+            lock (_serviceBuildLock)
+            {
+                foreach (var (iface, impl) in _resolveTypes)
+                {
+                    if (impl.Assembly == oldAssembly)
+                        toRemove.Add(iface);
+                }
+
+                foreach (var iface in toRemove)
+                {
+                    _resolveTypes.Remove(iface);
+                    _resolveFactories.Remove(iface);
+                }
+            }
+
+            if (toRemove.Count > 0)
+            {
+                // We can rebuild him
+                var toRemoveSet = new HashSet<Type>(toRemove);
+                var remaining = _services
+                    .Where(kv => !toRemoveSet.Contains(kv.Key))
+                    .ToDictionary(kv => kv.Key, kv => kv.Value);
+                _services = remaining.ToFrozenDictionary();
+
+                using (_injectorCacheLock.WriteGuard())
+                {
+                    _injectorCache.Clear();
+                }
+            }
+        }
+        // DevaStation end
 
         /// <inheritdoc />
         [System.Diagnostics.Contracts.Pure]

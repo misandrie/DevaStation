@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using JetBrains.Annotations;
 using Robust.Shared.Reflection;
 using Robust.Shared.Serialization.Markdown;
@@ -464,5 +465,10 @@ namespace Robust.Shared.Serialization.Manager
         #endregion
 
         public bool TryGetVariableType(Type type, string variableName, [NotNullWhen(true)] out Type? variableType);
+
+        // DevaStation start - hot-reload
+        void RemoveContentTypes(Assembly oldAssembly);
+        void RegisterContentTypes();
+        // DevaStation end
     }
 }

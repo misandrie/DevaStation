@@ -1,6 +1,7 @@
 using Robust.Shared.IoC.Exceptions;
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -183,6 +184,17 @@ namespace Robust.Shared.IoC
             if (_container.IsValueCreated)
                 _container.Value!.Clear();
         }
+
+        // DevaStation start - hot-reload
+        /// <summary>
+        /// Removes all IoC registrations where the implementation type belongs to the given assembly.
+        /// </summary>
+        internal static void RemoveRegistrations(Assembly oldAssembly)
+        {
+            if (_container.IsValueCreated && _container.Value is DependencyCollection dc)
+                dc.RemoveRegistrations(oldAssembly);
+        }
+        // DevaStation end
 
         /// <summary>
         /// Resolve a dependency manually.

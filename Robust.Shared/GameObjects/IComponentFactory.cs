@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using JetBrains.Annotations;
 using Robust.Shared.GameStates;
 using Robust.Shared.Prototypes;
@@ -307,5 +308,8 @@ namespace Robust.Shared.GameObjects
         /// </summary>
         /// <param name="networkedOnly">Whether to include all components or only networked ones.</param>
         byte[] GetHash(bool networkedOnly);
+
+        // DevaStation - hot-reload
+        void RemoveComponentsByAssembly(Assembly oldAssembly);
     }
 }

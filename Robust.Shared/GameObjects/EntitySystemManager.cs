@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Prometheus;
 using Robust.Shared.IoC;
@@ -272,6 +273,233 @@ namespace Robust.Shared.GameObjects
                 .Concat(GetBaseTypes(type.BaseType));
         }
 
+        // DevaStation start - hot-reload
+
+        ///
+        /// Okay so we decide to unfuck systems at runtime, what does it take?
+        /// For one, we have to find out what a system is, and where it is.
+        /// For two, we have to fuck up EntityManager to unlock subscriptions because ofc you cant unsub from events EVEN IF there's a public API method just for that!
+        /// For three, we shut it all down
+        /// For four, we unperson them, they never happened, and redo update order
+        /// And at last we have removed a system from the game
+        ///
+        public void RemoveContentSystems(Assembly oldAssembly)
+        {
+            _sawmill.Info("Killing systems");
+
+            var contentTypes = new List<Type>();
+            foreach (var systemType in _systemTypes)
+            {
+                if (systemType.Assembly == oldAssembly)
+                {
+                    contentTypes.Add(systemType);
+                }
+            }
+
+            _sawmill.Info($"Found {contentTypes.Count} content systems to kill, just completely eviscerate, maim, gore even");
+
+            if (_entityManager is EntityManager entManEarly)
+            {
+                entManEarly.EventBusInternal.UnlockSubscriptions();
+            }
+
+            foreach (var systemType in contentTypes)
+            {
+                try
+                {
+                    var system = (IEntitySystem)SystemDependencyCollection.ResolveType(systemType);
+
+                    SystemUnloaded?.Invoke(this, new SystemChangedArgs(system));
+
+                    system.Shutdown();
+
+                    _entityManager.EventBus.UnsubscribeEvents(system);
+                }
+                catch (Exception e)
+                {
+                    _sawmill.Error($"Error removing system {systemType.Name}: {e}");
+                }
+            }
+
+            var contentTypeSet = new HashSet<Type>(contentTypes);
+            _systemTypes.RemoveAll(t => contentTypeSet.Contains(t));
+
+            SystemDependencyCollection.RemoveRegistrations(oldAssembly);
+
+            var excludedTypes = new HashSet<Type>();
+            var subTypes = new Dictionary<Type, Type>();
+
+            foreach (var type in _systemTypes)
+            {
+                excludedTypes.Add(type);
+                subTypes.Remove(type);
+
+                foreach (var baseType in GetBaseTypes(type))
+                {
+                    if (excludedTypes.Contains(baseType)) continue;
+
+                    if (subTypes.Remove(baseType))
+                    {
+                        excludedTypes.Add(baseType);
+                    }
+                    else
+                    {
+                        subTypes.Add(baseType, type);
+                    }
+                }
+            }
+
+            var (fUpdate, update) = CalculateUpdateOrder(_systemTypes, subTypes, SystemDependencyCollection);
+
+            _frameUpdateOrder = fUpdate.ToArray();
+            _updateOrder = update
+                .Select(s => new UpdateReg
+                {
+                    System = s,
+                    Monitor = _tickUsageHistogram.WithLabels(s.GetType().Name)
+                })
+                .ToArray();
+            _sawmill.Info("Killed systems");
+        }
+
+        // Basically above but GOOD this time
+        public void AddContentSystems()
+        {
+            _sawmill.Info("Reanimating systems");
+
+            var allSystemTypes = _reflectionManager.GetAllChildren<IEntitySystem>();
+
+            var existingTypes = new HashSet<Type>(_systemTypes);
+            var newTypes = allSystemTypes
+                .Where(type => !existingTypes.Contains(type))
+                .Where(type => !SystemDependencyCollection.TryResolveType(type, out _))
+                .ToList();
+
+            _sawmill.Info($"Found {newTypes.Count} systems to reanimate.");
+
+            if (newTypes.Count == 0)
+            {
+                return;
+            }
+
+            var excludedTypes = new HashSet<Type>(_systemTypes);
+            var subTypes = new Dictionary<Type, Type>();
+
+            foreach (var type in _systemTypes)
+            {
+                foreach (var baseType in GetBaseTypes(type))
+                {
+                    if (excludedTypes.Contains(baseType)) continue;
+
+                    if (subTypes.Remove(baseType))
+                    {
+                        excludedTypes.Add(baseType);
+                    }
+                    else
+                    {
+                        subTypes.Add(baseType, type);
+                    }
+                }
+            }
+
+            foreach (var type in newTypes)
+            {
+                _sawmill.Debug($"Registering system {type.Name}");
+
+                SystemDependencyCollection.Register(type);
+                _systemTypes.Add(type);
+
+                excludedTypes.Add(type);
+                subTypes.Remove(type);
+
+                // Also register under supertypes
+                foreach (var baseType in GetBaseTypes(type))
+                {
+                    if (excludedTypes.Contains(baseType)) continue;
+
+                    if (subTypes.Remove(baseType))
+                    {
+                        excludedTypes.Add(baseType);
+                    }
+                    else
+                    {
+                        subTypes.Add(baseType, type);
+                    }
+                }
+            }
+
+            foreach (var (baseType, type) in subTypes)
+            {
+                // Skip anything that survived
+                if (SystemDependencyCollection.TryResolveType(baseType, out _))
+                {
+                    _systemTypes.Remove(baseType);
+                    continue;
+                }
+
+                SystemDependencyCollection.Register(baseType, type, overwrite: true);
+                _systemTypes.Remove(baseType);
+            }
+
+            SystemDependencyCollection.BuildGraph();
+
+            foreach (var systemType in newTypes)
+            {
+                try
+                {
+                    var system = (IEntitySystem)SystemDependencyCollection.ResolveType(systemType);
+                    system.Initialize();
+                    SystemLoaded?.Invoke(this, new SystemChangedArgs(system));
+                }
+                catch (Exception e)
+                {
+                    _sawmill.Error($"Error initializing system {systemType.Name}: {e}");
+                }
+            }
+
+            var allSubTypes = new Dictionary<Type, Type>();
+            var allExcluded = new HashSet<Type>();
+
+            foreach (var type in _systemTypes)
+            {
+                allExcluded.Add(type);
+                allSubTypes.Remove(type);
+
+                foreach (var baseType in GetBaseTypes(type))
+                {
+                    if (allExcluded.Contains(baseType)) continue;
+
+                    if (allSubTypes.Remove(baseType))
+                    {
+                        allExcluded.Add(baseType);
+                    }
+                    else
+                    {
+                        allSubTypes.Add(baseType, type);
+                    }
+                }
+            }
+
+            var (fUpdate, update) = CalculateUpdateOrder(_systemTypes, allSubTypes, SystemDependencyCollection);
+
+            _frameUpdateOrder = fUpdate.ToArray();
+            _updateOrder = update
+                .Select(s => new UpdateReg
+                {
+                    System = s,
+                    Monitor = _tickUsageHistogram.WithLabels(s.GetType().Name)
+                })
+                .ToArray();
+
+            if (_entityManager is EntityManager entMan)
+            {
+                entMan.EventBusInternal.LockSubscriptions();
+            }
+
+            _sawmill.Info("Systems do be reanimated tho");
+        }
+        // DevaStation end
+
         /// <inheritdoc />
         public void Shutdown()
         {
@@ -281,7 +509,18 @@ namespace Robust.Shared.GameObjects
                 if(SystemDependencyCollection == null) continue;
                 var system = (IEntitySystem)SystemDependencyCollection.ResolveType(systemType);
                 SystemUnloaded?.Invoke(this, new SystemChangedArgs(system));
-                system.Shutdown();
+
+                // DevaStation start - hot-reload
+                try
+                {
+                    system.Shutdown();
+                }
+                catch (Exception e)
+                {
+                    _sawmill.Error($"Caught exception shutting down system {systemType.Name}: {e}");
+                }
+                // DevaStation end
+
                 _entityManager.EventBus.UnsubscribeEvents(system);
             }
 

@@ -54,6 +54,13 @@ namespace Robust.Shared.Testing
         {
             // Only used for ILVerify, not necessary.
         }
+        // DevaStation - hot-reload
+        public (Assembly oldAssembly, Assembly newAssembly)? ReloadSingleAssembly(string assemblyName, ResPath assemblyDirectory, string filterPrefix)
+        {
+            // nop
+            return null;
+        }
+
 #pragma warning disable CS0067 // Needed by interface
         public event ExtraModuleLoad? ExtraModuleLoaders;
 #pragma warning restore CS0067

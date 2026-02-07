@@ -70,10 +70,16 @@ namespace Robust.Shared.Console
                     continue;
 
                 var instance = (IConsoleCommand)_typeFactory.CreateInstanceUnchecked(type, true);
-                if (AvailableCommands.TryGetValue(instance.Command, out var duplicate))
+
+                // DevaStation start - hot-reload
+                if (AvailableCommands.TryGetValue(instance.Command, out var existing))
                 {
+                    // Allow re-registration of the same command type during hot-reload
+                    if (existing.GetType().FullName == instance.GetType().FullName)
+                        continue;
+
                     throw new InvalidImplementationException(instance.GetType(), typeof(IConsoleCommand),
-                        $"Command name already registered: {instance.Command}, previous: {duplicate.GetType()}");
+                        $"Command name already registered: {instance.Command}, previous: {existing.GetType()}");
                 }
 
                 RegisteredCommands[instance.Command] = instance;
@@ -110,9 +116,6 @@ namespace Robust.Shared.Console
             ConCommandCallback callback,
             bool requireServerOrSingleplayer = false)
         {
-            if (RegisteredCommands.ContainsKey(command))
-                throw new InvalidOperationException($"Command already registered: {command}");
-
             var newCmd = new RegisteredCommand(command, description, help, callback, requireServerOrSingleplayer);
             RegisterCommand(newCmd);
         }
@@ -125,9 +128,6 @@ namespace Robust.Shared.Console
             ConCommandCompletionCallback completionCallback,
             bool requireServerOrSingleplayer = false)
         {
-            if (RegisteredCommands.ContainsKey(command))
-                throw new InvalidOperationException($"Command already registered: {command}");
-
             var newCmd = new RegisteredCommand(command, description, help, callback, completionCallback, requireServerOrSingleplayer);
             RegisterCommand(newCmd);
         }
@@ -140,8 +140,6 @@ namespace Robust.Shared.Console
             ConCommandCompletionAsyncCallback completionCallback,
             bool requireServerOrSingleplayer = false)
         {
-            if (RegisteredCommands.ContainsKey(command))
-                throw new InvalidOperationException($"Command already registered: {command}");
 
             var newCmd = new RegisteredCommand(command, description, help, callback, completionCallback, requireServerOrSingleplayer);
             RegisterCommand(newCmd);
@@ -179,13 +177,25 @@ namespace Robust.Shared.Console
 
         public void RegisterCommand(IConsoleCommand command)
         {
-            RegisteredCommands.Add(command.Command, command);
+            // DevaStation start - hot-reload: use indexer for safe overwrite
+            RegisteredCommands[command.Command] = command;
+            // DevaStation end
 
             if (!_isInRegistrationRegion)
                 UpdateAvailableCommands();
         }
 
         #endregion
+
+        /// <summary>
+        /// Clears all registered commands and auto-registration tracking.
+        /// Used during hot-reload teardown to remove commands from unloaded content assemblies.
+        /// </summary>
+        public void ClearAllCommands()
+        {
+            RegisteredCommands.Clear();
+            _autoRegisteredCommands.Clear();
+        }
 
         /// <inheritdoc />
         public void UnregisterCommand(string command)

@@ -374,9 +374,11 @@ namespace Robust.Shared.Localization
 
         public void LoadCulture(CultureInfo culture)
         {
-            // Attempting to load an already loaded culture
+            // DevaStation start - hot-reload
+            // Localization resources come from the VFS, not content assemblies, so they're still valid.
             if (HasCulture(culture))
-                throw new InvalidOperationException("Culture is already loaded");
+                return;
+            // DevaStation end
 
             var bundle = LinguiniBuilder.Builder()
                 .CultureInfo(culture)

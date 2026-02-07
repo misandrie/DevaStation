@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Robust.Shared.Enums;
 using Robust.Shared.GameObjects;
 using Robust.Shared.GameStates;
@@ -218,4 +219,9 @@ public interface ISharedPlayerManager
     /// Set the session's status to <see cref="SessionStatus.InGame"/>.
     /// </summary>
     void JoinGame(ICommonSession session);
+
+    /// <summary>
+    /// Removes event subscribers whose target belongs to a content assembly.
+    /// </summary>
+    void ClearContentEventSubscribers(Assembly oldAssembly);
 }

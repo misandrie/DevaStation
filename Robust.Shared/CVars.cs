@@ -1525,6 +1525,16 @@ namespace Robust.Shared
         public static readonly CVarDef<int> DebugTargetFps =
             CVarDef.Create("debug.target_fps", 60, CVar.CLIENTONLY | CVar.ARCHIVE);
 
+        // DevaStation start
+        /// <summary>
+        /// Whether to enable assembly hot-reloading for content assemblies.
+        /// When enabled, content DLLs marked with [assembly: AssemblyMetadata("HotReloadable", "true")]
+        /// will be watched for changes and reloaded at runtime
+        /// </summary>
+        public static readonly CVarDef<bool> HotReload =
+            CVarDef.Create("devaStation.hot_reload", true);
+        // DevaStation end
+
         /*
          * MIDI
          */

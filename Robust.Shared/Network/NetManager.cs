@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -428,6 +429,21 @@ namespace Robust.Shared.Network
             _cancelConnectTokenSource?.Cancel();
             ClientConnectState = ClientConnectionState.NotConnecting;
         }
+
+        // DevaStation start - hot-reload
+        public void RemoveNetMessages(Assembly oldAssembly)
+        {
+            var toRemove = _messages
+                .Where(kv => kv.Value.Type.Assembly == oldAssembly)
+                .Select(kv => kv.Key)
+                .ToList();
+
+            foreach (var key in toRemove)
+            {
+                _messages.Remove(key);
+            }
+        }
+        // DevaStation end
 
         /// <inheritdoc />
         public void Shutdown(string reason)
@@ -1015,7 +1031,7 @@ namespace Robust.Shared.Network
                 IsHandshake = (accept & NetMessageAccept.Handshake) != 0
             };
 
-            _messages.Add(name, data);
+            _messages[name] = data; // DevaStation start - hot-reload: use index
 
             var thisSide = IsServer ? NetMessageAccept.Server : NetMessageAccept.Client;
 

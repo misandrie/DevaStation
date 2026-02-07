@@ -84,5 +84,24 @@ namespace Robust.Shared.ContentPack
 
         void Shutdown();
         event ExtraModuleLoad ExtraModuleLoaders;
+
+        // DevaStation start - hot-reload
+
+        /// <summary>
+        /// Broadcasts a run level change to entry points of a specific assembly only.
+        /// </summary>
+        void BroadcastRunLevelForAssembly(ModRunLevel level, Assembly assembly);
+
+        /// <summary>
+        /// Reloads a single content assembly by loading the new version from disk into
+        /// a fresh collectible ALC. The old assembly version remains loaded
+        /// Other content assemblies are untouched.
+        /// </summary>
+        /// <param name="assemblyName">Name of the assembly to reload (e.g., "Content.Server").</param>
+        /// <param name="assemblyDirectory">VFS directory containing the DLL.</param>
+        /// <param name="filterPrefix">Assembly filter prefix (e.g., "Content.").</param>
+        /// <returns>Tuple of (oldAssembly, newAssembly), or null on failure.</returns>
+        (Assembly oldAssembly, Assembly newAssembly)? ReloadSingleAssembly(string assemblyName, ResPath assemblyDirectory, string filterPrefix);
+        // DevaStation end
     }
 }

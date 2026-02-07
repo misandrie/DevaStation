@@ -29,10 +29,15 @@ namespace Robust.Shared.Map
         public virtual void Register(ITileDefinition tileDef)
         {
             var name = tileDef.ID;
-            if (_tileNames.ContainsKey(name))
+            // DevaStation start - hot-reload: Keep tiledefs in place
+            if (_tileNames.TryGetValue(name, out var existing))
             {
-                throw new ArgumentException("Another tile definition or alias with the same name has already been registered.", nameof(tileDef));
+                tileDef.AssignTileId(existing.TileId);
+                TileDefs[existing.TileId] = tileDef;
+                _tileNames[name] = tileDef;
+                return;
             }
+            // DevaStation end
 
             var id = checked((ushort) TileDefs.Count);
             tileDef.AssignTileId(id);

@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using System.Net;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -302,6 +303,9 @@ namespace Robust.UnitTesting
                 if (rxCallback != null && (accept & thisSide) != 0)
                     _callbacks.Add(typeof(T), msg => rxCallback((T) msg));
             }
+
+            // DevaStation start - hot-reload
+            public void RemoveNetMessages(Assembly oldAssembly) { }
 
             public T CreateNetMessage<T>() where T : NetMessage, new()
             {

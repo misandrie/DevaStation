@@ -25,7 +25,7 @@ namespace Robust.Shared.ContentPack
         // List of extra assemblies side-loaded from the /Assemblies/ mounted path.
         private readonly List<Assembly> _sideModules = new();
 
-        private readonly AssemblyLoadContext _loadContext;
+        private AssemblyLoadContext _loadContext; // DevaStation - removed readonly for hot-reload ALC swap
 
         private readonly object _lock = new();
 
@@ -46,7 +46,7 @@ namespace Robust.Shared.ContentPack
         public ModLoader()
         {
             var id = Interlocked.Increment(ref _modLoaderId);
-            _loadContext = new AssemblyLoadContext($"ModLoader-{id}");
+            _loadContext = new AssemblyLoadContext($"ModLoader-{id}", isCollectible: true); // DevaStation - collectible for hot-reload
 
             _loadContext.Resolving += ResolvingAssembly;
 
@@ -64,6 +64,22 @@ namespace Robust.Shared.ContentPack
             _sandboxingEnabled = sandboxing;
             Sawmill.Debug("{0} sandboxing", sandboxing ? "ENABLING" : "DISABLING");
         }
+
+        // DevaStation start - hot-reload assembly metadata check
+        /// <summary>
+        /// Checks if an assembly is marked as hot-reloadable via AssemblyMetadata.
+        /// Uses [assembly: AssemblyMetadata("HotReloadable", "true")] - no new types needed.
+        /// </summary>
+        internal static bool IsHotReloadable(Assembly assembly)
+        {
+            foreach (var attr in assembly.GetCustomAttributes<AssemblyMetadataAttribute>())
+            {
+                if (attr.Key == "HotReloadable" && attr.Value == "true")
+                    return true;
+            }
+            return false;
+        }
+        // DevaStation end
 
         public Func<string, Stream?>? VerifierExtraLoadHandler { get; set; }
 
@@ -323,6 +339,91 @@ namespace Robust.Shared.ContentPack
             Sawmill.Warning($"Could not load {assemblyName} DLL: {dllPath} does not exist in the VFS.");
             return false;
         }
+
+        // DevaStation start - hot-reload
+        /// <summary>
+        /// Reloads a single content assembly by loading the new version from disk into
+        /// a fresh collectible ALC. The old version remains loaded.
+        /// </summary>
+        public (Assembly oldAssembly, Assembly newAssembly)? ReloadSingleAssembly(
+            string assemblyName, ResPath assemblyDirectory, string filterPrefix)
+        {
+            Sawmill.Info($"Reloading assembly: {assemblyName}");
+
+            var oldAssembly = RemoveMod(assemblyName);
+            if (oldAssembly == null)
+            {
+                Sawmill.Error($"{assemblyName} wasn't there when trying to remove it.");
+                return null;
+            }
+
+            ReflectionManager.RemoveAssembly(oldAssembly);
+
+            string? diskPath = null;
+            foreach (var filePath in _res.ContentFindRelativeFiles(assemblyDirectory)
+                         .Where(p => p.Filename.StartsWith(filterPrefix) && p.Extension == "dll"))
+            {
+                var fullVfsPath = assemblyDirectory / filePath;
+                var name = Path.GetFileNameWithoutExtension(filePath.Filename);
+                if (name == assemblyName && _res.TryGetDiskFilePath(fullVfsPath, out var dp))
+                {
+                    diskPath = dp;
+                    break;
+                }
+            }
+
+            if (diskPath == null)
+            {
+                Sawmill.Error($"Could not find DLL on disk for '{assemblyName}'.");
+                return null;
+            }
+
+            var id = Interlocked.Increment(ref _modLoaderId);
+            var reloadContext = new AssemblyLoadContext($"HotReload-{assemblyName}-{id}", isCollectible: true);
+
+            reloadContext.Resolving += (ctx, asmName) =>
+            {
+                foreach (var mod in Mods)
+                {
+                    if (mod.GameAssembly.GetName().Name == asmName.Name)
+                        return mod.GameAssembly;
+                }
+
+                foreach (var sideAsm in _sideModules)
+                {
+                    if (sideAsm.GetName().Name == asmName.Name)
+                        return sideAsm;
+                }
+
+                try { return _loadContext.LoadFromAssemblyName(asmName); }
+                catch { /* fall through */ }
+
+                // Just go to default whatever
+                return null;
+            };
+
+            // LoadFromStream is used here because CLR caches paths.
+            var oldMvid = oldAssembly.ManifestModule.ModuleVersionId;
+            var dllBytes = File.ReadAllBytes(diskPath);
+            var dllStream = new MemoryStream(dllBytes);
+
+            MemoryStream? pdbStream = null;
+            var pdbPath = Path.ChangeExtension(diskPath, ".pdb");
+            if (File.Exists(pdbPath))
+            {
+                pdbStream = new MemoryStream(File.ReadAllBytes(pdbPath));
+            }
+
+            var newAssembly = reloadContext.LoadFromStream(dllStream, pdbStream);
+            var newMvid = newAssembly.ManifestModule.ModuleVersionId;
+            if (oldMvid == newMvid)
+                Sawmill.Warning($"{newAssembly.GetName().Name} old and new assemblies have the same MVID, assembly was not rebuilt!");
+
+            InitMod(newAssembly);
+
+            return (oldAssembly, newAssembly);
+        }
+        // DevaStation end
 
         private Assembly? ResolvingAssembly(AssemblyLoadContext context, AssemblyName name)
         {

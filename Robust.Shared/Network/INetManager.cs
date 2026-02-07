@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace Robust.Shared.Network
@@ -141,5 +142,8 @@ namespace Robust.Shared.Network
         /// <returns>Instance of the NetMessage.</returns>
         [Obsolete("Just new NetMessage directly")]
         T CreateNetMessage<T>() where T : NetMessage, new();
+
+        // DevaStation start - hot-reload
+        void RemoveNetMessages(Assembly oldAssembly);
     }
 }

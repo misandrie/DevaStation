@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using JetBrains.Annotations;
 using Robust.Shared.GameStates;
 using Robust.Shared.IoC;
@@ -96,8 +97,9 @@ namespace Robust.Shared.GameObjects
             if (_networkedComponents is not null)
                 throw new ComponentRegistrationLockException();
 
-            if (types.ContainsKey(type))
-                throw new InvalidOperationException($"Type is already registered: {type}");
+            // DevaStation - hot-reload
+            if (types.TryGetValue(type, out var register))
+                return register;
 
             if (!type.IsSubclassOf(typeof(Component)))
                 throw new InvalidOperationException($"Type is not derived from component: {type}");
@@ -554,6 +556,64 @@ namespace Robust.Shared.GameObjects
         }
 
         public Type IdxToType(CompIdx idx) => _idxToType[idx];
+
+        // DevaStation start
+        internal void Reset()
+        {
+            _names = FrozenDictionary<string, ComponentRegistration>.Empty;
+            _lowerCaseNames = FrozenDictionary<string, string>.Empty;
+            _networkedComponents = null; // Unlock registration
+            _types = FrozenDictionary<Type, ComponentRegistration>.Empty;
+            _array = Array.Empty<ComponentRegistration>();
+            _idxToType = FrozenDictionary<CompIdx, Type>.Empty;
+            _typeToIdx = FrozenDictionary<Type, CompIdx>.Empty;
+            _ignoreMissingComponentPostfix = null;
+        }
+
+
+        /// <remarks>_ignored and _array being untouched is fine, and holes in the latter are acceptable</remarks>
+        public void RemoveComponentsByAssembly(Assembly oldAssembly)
+        {
+            // We got the shoes
+            var contentRegs = new List<ComponentRegistration>();
+            foreach (var reg in _types.Values)
+            {
+                if (reg.Type.Assembly == oldAssembly)
+                    contentRegs.Add(reg);
+            }
+
+            if (contentRegs.Count == 0)
+            {
+                return;
+            }
+
+            // We got the money
+            var names = _names.ToDictionary();
+            var lowerCaseNames = _lowerCaseNames.ToDictionary();
+            var types = _types.ToDictionary();
+            var idxToType = _idxToType.ToDictionary();
+            var typeToIdx = _typeToIdx.ToDictionary();
+
+            foreach (var reg in contentRegs)
+            {
+                names.Remove(reg.Name);
+                lowerCaseNames.Remove(reg.Name.ToLowerInvariant());
+                types.Remove(reg.Type);
+                idxToType.Remove(reg.Idx);
+                typeToIdx.Remove(reg.Type);
+            }
+
+            _names = names.ToFrozenDictionary();
+            _lowerCaseNames = lowerCaseNames.ToFrozenDictionary();
+            _types = types.ToFrozenDictionary();
+            _idxToType = idxToType.ToFrozenDictionary();
+            _typeToIdx = typeToIdx.ToFrozenDictionary();
+
+            _networkedComponents = null;
+
+            _sawmill.Info($"Removed {contentRegs.Count} components.");
+        }
+        // DevaStation end
 
         public byte[] GetHash(bool networkedOnly)
         {

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Robust.Shared.IoC;
 using Robust.Shared.IoC.Exceptions;
 
@@ -137,5 +138,10 @@ namespace Robust.Shared.GameObjects
         /// Dependency collection that contains all the loaded systems.
         /// </summary>
         public IDependencyCollection DependencyCollection { get; }
+
+        // DevaStation start - hot-reload
+        void RemoveContentSystems(Assembly oldAssembly);
+        void AddContentSystems();
+        // DevaStation end
     }
 }

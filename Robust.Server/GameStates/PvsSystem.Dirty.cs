@@ -30,6 +30,10 @@ namespace Robust.Server.GameStates
                 _addEntities[i] = new HashSet<EntityUid>(32);
                 _dirtyEntities[i] = new HashSet<EntityUid>(32);
             }
+            // DevaStation start - hot-reload
+            // Sync _currentIndex to current tick so the assertion in OnEntityAdd holds after reinit
+            _currentIndex = (int)(_gameTiming.CurTick.Value % DirtyBufferSize);
+            // DevaStation end
             EntityManager.EntityAdded += OnEntityAdd;
             EntityManager.EntityDirtied += OnEntityDirty;
         }
@@ -42,6 +46,19 @@ namespace Robust.Server.GameStates
 
         private void OnEntityAdd(Entity<MetaDataComponent> e)
         {
+            // DevaStation start - hot-reload
+            // Auto-correct _currentIndex when stale. CleanupDirty() only runs from
+            // AfterSerializeStates() which requires connected players, so after a
+            // hot-reload with no clients _currentIndex drifts from the actual tick.
+            var expectedIndex = (int)(_gameTiming.CurTick.Value % DirtyBufferSize);
+            if (_currentIndex != expectedIndex
+                && _gameTiming.GetType().Name != "IGameTimingProxy")
+            {
+                _currentIndex = expectedIndex;
+                _addEntities[_currentIndex].Clear();
+                _dirtyEntities[_currentIndex].Clear();
+            }
+            // DevaStation end
             DebugTools.Assert(_currentIndex == _gameTiming.CurTick.Value % DirtyBufferSize ||
                 _gameTiming.GetType().Name == "IGameTimingProxy");// Look I have NFI how best to excuse this assert if the game timing isn't real (a Mock<IGameTiming>).
             _addEntities[_currentIndex].Add(e);
@@ -54,6 +71,17 @@ namespace Robust.Server.GameStates
                 ref var meta = ref _metadataMemory.GetRef(uid.Comp.PvsData.Index);
                 meta.LastModifiedTick = uid.Comp.EntityLastModifiedTick;
             }
+
+            // DevaStation start - hot-reload
+            // OH MY STALE _currentIndex!
+            var expectedIndex = (int)(_gameTiming.CurTick.Value % DirtyBufferSize);
+            if (_currentIndex != expectedIndex)
+            {
+                _currentIndex = expectedIndex;
+                _addEntities[_currentIndex].Clear();
+                _dirtyEntities[_currentIndex].Clear();
+            }
+            // DevaStation end
 
             if (!_addEntities[_currentIndex].Contains(uid))
                 _dirtyEntities[_currentIndex].Add(uid);

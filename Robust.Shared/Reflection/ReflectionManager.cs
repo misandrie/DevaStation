@@ -117,6 +117,33 @@ namespace Robust.Shared.Reflection
             OnAssemblyAdded?.Invoke(this, new ReflectionUpdateEventArgs(this));
         }
 
+        // DevaStation start - hot-reload
+        public void RemoveAssembly(Assembly assembly)
+        {
+            if (!assemblies.Remove(assembly))
+                return;
+
+            _getAllTypesCache.Clear();
+
+            lock (_looseTypeCache)
+            {
+                _looseTypeCache.Clear();
+            }
+
+            using (_yamlTypeTagCacheLock.WriteGuard())
+            {
+                _yamlTypeTagCache.Clear();
+            }
+
+            using (_enumCacheLock.WriteGuard())
+            {
+                _enumCache.Clear();
+                _reverseEnumCache.Clear();
+            }
+        }
+
+        // DevaStation end
+
         /// <seealso cref="TypePrefixes"/>
         public Type? GetType(string name)
         {

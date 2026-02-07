@@ -3,6 +3,7 @@ using Robust.Client.Audio;
 using Robust.Client.Audio.Midi;
 using Robust.Client.Configuration;
 using Robust.Client.Console;
+using Robust.Client.ContentPack;
 using Robust.Client.Debugging;
 using Robust.Client.GameObjects;
 using Robust.Client.GameStates;
@@ -174,6 +175,7 @@ namespace Robust.Client
             deps.Register<IXamlProxyHelper, XamlProxyHelper>();
             deps.Register<MarkupTagManager>();
             deps.Register<IHWId, BasicHWId>();
+            deps.Register<HotReloadManager, ClientHotReloadManager>(); // DevaStation - hot-reload
         }
     }
 }

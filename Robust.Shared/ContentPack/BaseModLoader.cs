@@ -67,6 +67,73 @@ namespace Robust.Shared.ContentPack
             return false;
         }
 
+        // DevaStation start - hot-reload
+        internal void ClearMods()
+        {
+            Mods.Clear();
+        }
+
+        /// <summary>
+        /// Removes a single mod by assembly name. Shuts down and disposes its entry points.
+        /// Returns the old assembly, or null if not found.
+        /// </summary>
+        internal Assembly? RemoveMod(string assemblyName)
+        {
+            for (int i = 0; i < Mods.Count; i++)
+            {
+                var mod = Mods[i];
+                if (mod.GameAssembly.GetName().Name != assemblyName)
+                    continue;
+
+                // Shutdown and dispose entry points for this mod only
+                foreach (var entry in mod.EntryPoints)
+                {
+                    entry.Shutdown();
+                }
+                foreach (var entry in mod.EntryPoints)
+                {
+                    entry.Dispose();
+                }
+
+                Mods.RemoveAt(i);
+                return mod.GameAssembly;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Broadcasts a run level change to entry points of a specific assembly only.
+        /// </summary>
+        public void BroadcastRunLevelForAssembly(ModRunLevel level, Assembly assembly)
+        {
+            foreach (var mod in Mods)
+            {
+                if (mod.GameAssembly != assembly)
+                    continue;
+
+                foreach (var entry in mod.EntryPoints)
+                {
+                    switch (level)
+                    {
+                        case ModRunLevel.PreInit:
+                            entry.PreInit();
+                            break;
+                        case ModRunLevel.Init:
+                            entry.Init();
+                            break;
+                        case ModRunLevel.PostInit:
+                            entry.PostInit();
+                            break;
+                        default:
+                            Sawmill.Error($"Unknown RunLevel: {level}");
+                            break;
+                    }
+                }
+            }
+        }
+        // DevaStation end
+
         public void BroadcastRunLevel(ModRunLevel level)
         {
             foreach (var mod in Mods)

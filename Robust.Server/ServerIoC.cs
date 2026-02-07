@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using Robust.Server.Configuration;
 using Robust.Server.Console;
+using Robust.Server.ContentPack;
 using Robust.Server.DataMetrics;
 using Robust.Server.GameObjects;
 using Robust.Server.GameStates;
@@ -102,6 +103,7 @@ namespace Robust.Server
             deps.Register<IHWId, DummyHWId>();
             deps.Register<ILocalizationManager, ServerLocalizationManager>();
             deps.Register<ILocalizationManagerInternal, ServerLocalizationManager>();
+            deps.Register<HotReloadManager, ServerHotReloadManager>(); // DevaStation - hot-reload
         }
     }
 }

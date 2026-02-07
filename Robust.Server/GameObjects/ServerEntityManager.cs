@@ -271,7 +271,7 @@ namespace Robust.Server.GameObjects
             switch (args.NewStatus)
             {
                 case SessionStatus.Connected:
-                    _lastProcessedSequencesCmd.Add(args.Session, 0);
+                    _lastProcessedSequencesCmd[args.Session] = 0; // DevaStation - hot-reload: use indexing
                     break;
 
                 case SessionStatus.Disconnected:

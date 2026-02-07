@@ -229,7 +229,7 @@ public sealed class ViewVariablesTypeHandler<T> : ViewVariablesTypeHandler
     /// <inheritdoc cref="AddPath(string,PathHandler)"/>
     public ViewVariablesTypeHandler<T> AddPath(string path, PathHandler handler)
     {
-        _paths.Add(path, handler);
+        _paths[path] = handler; // DevaStation start - hot-reload: use indexing
         return this;
     }
 

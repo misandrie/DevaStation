@@ -254,6 +254,12 @@ namespace Robust.Shared.GameObjects
             ClearComponents();
             ShuttingDown = false;
             Started = false;
+
+            // DevaStation start - hot-reload
+            _componentFactory.ComponentsAdded -= OnComponentsAdded;
+            Initialized = false;
+            // DevaStation end
+
             _entityConsoleHost.Shutdown();
         }
 

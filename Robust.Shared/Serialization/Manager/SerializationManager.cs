@@ -283,6 +283,165 @@ namespace Robust.Shared.Serialization.Manager
                 .Invoke(new object[]{this, isRecord});
         }
 
+        // DevaStation start - hot-reload
+        public void RemoveContentTypes(Assembly oldAssembly)
+        {
+            foreach (var key in _dataDefinitions.Keys)
+            {
+                if (key.Assembly == oldAssembly)
+                    _dataDefinitions.TryRemove(key, out _);
+            }
+
+            foreach (var key in _copyByRefRegistrations.Keys)
+            {
+                if (key.Assembly == oldAssembly)
+                    _copyByRefRegistrations.TryRemove(key, out _);
+            }
+
+            foreach (var key in _flagsMapping.Keys.ToArray())
+            {
+                if (key.Assembly == oldAssembly)
+                    _flagsMapping.Remove(key);
+            }
+
+            foreach (var key in _constantsMapping.Keys.ToArray())
+            {
+                if (key.Assembly == oldAssembly)
+                    _constantsMapping.Remove(key);
+            }
+
+            foreach (var key in _highestFlagBit.Keys.ToArray())
+            {
+                if (key.Assembly == oldAssembly)
+                    _highestFlagBit.Remove(key);
+            }
+
+            _readBoxingDelegates.Clear();
+            _readGenericBaseDelegates.Clear();
+            _readGenericDelegates.Clear();
+
+            _writeBoxingDelegates.Clear();
+            _writeGenericBaseDelegates.Clear();
+            _writeGenericDelegates.Clear();
+
+            _copyToGenericDelegates.Clear();
+            _copyToGenericBaseDelegates.Clear();
+            _copyToBoxingDelegates.Clear();
+            _createCopyGenericDelegates.Clear();
+            _createCopyBoxingDelegates.Clear();
+
+            _validationDelegates.Clear();
+            _compositionPushers.Clear();
+            _customTypeSerializers.Clear();
+
+            _instantiators.Clear();
+        }
+
+        public void RegisterContentTypes()
+        {
+            var flagsTypes = new ConcurrentBag<Type>();
+            var constantsTypes = new ConcurrentBag<Type>();
+            var typeSerializers = new ConcurrentBag<Type>();
+            var meansDataDef = new ConcurrentBag<Type>();
+            var meansDataRecord = new ConcurrentBag<Type>();
+            var implicitDataDef = new ConcurrentBag<Type>();
+            var implicitDataRecord = new ConcurrentBag<Type>();
+
+            CollectAttributedTypes(flagsTypes, constantsTypes, typeSerializers, meansDataDef, meansDataRecord, implicitDataDef, implicitDataRecord);
+
+            // InitializeFlagsAndConstants uses Add which throws on duplicates, so filter to only new entries
+            var newFlags = flagsTypes.Where(t =>
+            {
+                var attrs = t.GetCustomAttributes<FlagsForAttribute>(true);
+                return attrs.Any(a => !_flagsMapping.ContainsKey(a.Tag));
+            });
+            var newConstants = constantsTypes.Where(t =>
+            {
+                var attrs = t.GetCustomAttributes<ConstantsForAttribute>(true);
+                return attrs.Any(a => !_constantsMapping.ContainsKey(a.Tag));
+            });
+            InitializeFlagsAndConstants(newFlags, newConstants);
+
+            InitializeTypeSerializers(typeSerializers);
+
+            var registrations = new ConcurrentBag<Type>();
+            var records = new ConcurrentDictionary<Type, byte>();
+
+            IEnumerable<Type> GetImplicitTypes(Type type)
+            {
+                if (type.IsInterface)
+                {
+                    foreach (var child in _reflectionManager.GetAllChildren(type))
+                    {
+                        if (child.IsAbstract || child.IsGenericTypeDefinition || child.IsInterface)
+                            continue;
+
+                        yield return child;
+                    }
+                }
+                else if (!type.IsAbstract && !type.IsGenericTypeDefinition)
+                {
+                    yield return type;
+                }
+            }
+
+            foreach (var baseType in implicitDataDef)
+            {
+                foreach (var type in GetImplicitTypes(baseType))
+                {
+                    registrations.Add(type);
+                }
+            }
+
+            foreach (var baseType in implicitDataRecord)
+            {
+                foreach (var type in GetImplicitTypes(baseType))
+                {
+                    records.TryAdd(type, 0);
+                }
+            }
+
+            Parallel.ForEach(_reflectionManager.FindAllTypes(), type =>
+            {
+                if (meansDataDef.Any(type.IsDefined))
+                    registrations.Add(type);
+
+                if (type.IsDefined(typeof(DataRecordAttribute)) || meansDataRecord.Any(type.IsDefined))
+                    records[type] = 0;
+
+                if (type.IsDefined(typeof(CopyByRefAttribute)))
+                    _copyByRefRegistrations[type] = 0;
+            });
+
+            var sawmill = Logger.GetSawmill(LogCategory);
+
+            Parallel.ForEach(registrations, type =>
+            {
+                if (_dataDefinitions.ContainsKey(type))
+                    return;
+
+                if (type.IsAbstract || type.IsInterface || type.IsGenericTypeDefinition)
+                {
+                    sawmill.Debug(
+                        $"Skipping registering data definition for type {type} since it is abstract or an interface");
+                    return;
+                }
+
+                var isRecord = records.ContainsKey(type);
+                if (!type.IsValueType && !isRecord && !type.HasParameterlessConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                {
+                    sawmill.Warning(
+                        $"Skipping registering data definition for type {type} since it has no parameterless ctor");
+                    return;
+                }
+
+                _dataDefinitions.GetOrAdd(type, static (t, s) => s.Item1.CreateDataDefinition(t, s.isRecord), (this, isRecord));
+            });
+
+            _copyByRefRegistrations[typeof(Type)] = 0;
+        }
+        // DevaStation end
+
         public void Shutdown()
         {
             _constantsMapping.Clear();

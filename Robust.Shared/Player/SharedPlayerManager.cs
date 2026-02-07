@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Robust.Shared.GameObjects;
 using Robust.Shared.IoC;
 using Robust.Shared.Log;
@@ -57,6 +58,20 @@ internal abstract partial class SharedPlayerManager : ISharedPlayerManager
         UserIdMap.Clear();
         PlayerData.Clear();
     }
+
+    // DevaStation - hot-reload
+    public void ClearContentEventSubscribers(Assembly oldAssembly)
+    {
+        if (PlayerStatusChanged == null)
+            return;
+
+        foreach (var d in PlayerStatusChanged.GetInvocationList())
+        {
+            if (d.Target != null && d.Target.GetType().Assembly == oldAssembly)
+                PlayerStatusChanged -= (EventHandler<SessionStatusEventArgs>)d;
+        }
+    }
+    // DevaStation end
 
     public bool TryGetUserId(string userName, out NetUserId userId)
     {
