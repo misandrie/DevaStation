@@ -70,7 +70,7 @@ internal sealed class AssemblyFileWatcher : IDisposable
 
         if (_watchers.Count == 0)
         {
-            _sawmill.Warning("No assembly directories found to watch. Hot-reload file watcher is snoozing.");
+            _sawmill.Info("No assembly directories found to watch. Hot-reload file watcher is snoozing.");
         }
     }
 
