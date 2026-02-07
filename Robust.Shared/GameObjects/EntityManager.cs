@@ -226,8 +226,12 @@ namespace Robust.Shared.GameObjects
 
         public virtual void Startup()
         {
-            if(!Initialized)
-                throw new InvalidOperationException("Startup() called without Initialized");
+            if (!Initialized)
+            {
+                // DevaStation - hot-reload: re-initialize after Shutdown() reset
+                InitializeComponents();
+                Initialized = true;
+            }
             if (Started)
                 throw new InvalidOperationException("Startup() called multiple times");
 
